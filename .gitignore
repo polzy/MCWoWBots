@@ -1,0 +1,22 @@
+# Editor / IDE
+/.vscode/
+/.idea/
+*.swp
+*.kate-swp
+*.tmp
+.DS_Store
+Thumbs.db
+
+# WoW client artifacts that might end up in the addon dir on test installs
+Cache/
+WTF/
+*.bak
+*.bak.lua
+*.lua.bak
+
+# Build / packaging
+*.zip
+*.7z
+*.rar
+/build/
+/dist/

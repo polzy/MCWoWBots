@@ -1,0 +1,447 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.blizzard.com/wow/ui/ ..\FrameXML\UI.xsd">
+
+    <!-- Main Frame -->
+    <Frame name="MCWoWBots_MainFrame" parent="UIParent" toplevel="true" movable="true" enableMouse="true" hidden="true">
+        <Size>
+            <AbsDimension x="280" y="460"/>
+        </Size>
+        <Anchors>
+            <Anchor point="CENTER"/>
+        </Anchors>
+        <Backdrop bgFile="Interface\DialogFrame\UI-DialogBox-Background"
+                  edgeFile="Interface\DialogFrame\UI-DialogBox-Border" tile="true">
+            <BackgroundInsets>
+                <AbsInset left="11" right="12" top="12" bottom="11"/>
+            </BackgroundInsets>
+            <TileSize>
+                <AbsValue val="32"/>
+            </TileSize>
+            <EdgeSize>
+                <AbsValue val="32"/>
+            </EdgeSize>
+        </Backdrop>
+        <Layers>
+            <Layer level="ARTWORK">
+                <FontString name="MCWoWBots_Title" inherits="GameFontNormalLarge" text="MCWoW Bot Manager">
+                    <Anchors>
+                        <Anchor point="TOP" relativeTo="MCWoWBots_MainFrame" relativePoint="TOP">
+                            <Offset>
+                                <AbsDimension x="0" y="-18"/>
+                            </Offset>
+                        </Anchor>
+                    </Anchors>
+                </FontString>
+                <FontString name="MCWoWBots_StatusText" inherits="GameFontNormalSmall" text="Group: 0/5">
+                    <Anchors>
+                        <Anchor point="TOP" relativeTo="MCWoWBots_Title" relativePoint="BOTTOM">
+                            <Offset>
+                                <AbsDimension x="0" y="-6"/>
+                            </Offset>
+                        </Anchor>
+                    </Anchors>
+                </FontString>
+            </Layer>
+        </Layers>
+        <Frames>
+            <!-- Close Button -->
+            <Button name="MCWoWBots_CloseBtn" inherits="UIPanelCloseButton">
+                <Anchors>
+                    <Anchor point="TOPRIGHT" relativeTo="MCWoWBots_MainFrame" relativePoint="TOPRIGHT">
+                        <Offset>
+                            <AbsDimension x="-5" y="-5"/>
+                        </Offset>
+                    </Anchor>
+                </Anchors>
+            </Button>
+
+            <!-- Group Section Header -->
+            <Frame name="MCWoWBots_GroupHeader">
+                <Size>
+                    <AbsDimension x="250" y="16"/>
+                </Size>
+                <Anchors>
+                    <Anchor point="TOP" relativeTo="MCWoWBots_StatusText" relativePoint="BOTTOM">
+                        <Offset>
+                            <AbsDimension x="0" y="-10"/>
+                        </Offset>
+                    </Anchor>
+                </Anchors>
+                <Layers>
+                    <Layer level="ARTWORK">
+                        <FontString inherits="GameFontNormal" text="-- Group --" justifyH="CENTER">
+                            <Anchors>
+                                <Anchor point="CENTER"/>
+                            </Anchors>
+                        </FontString>
+                    </Layer>
+                </Layers>
+            </Frame>
+
+            <!-- Fill Group Button -->
+            <Button name="MCWoWBots_FillGroupBtn" inherits="UIPanelButtonTemplate" text="Fill Group (5)">
+                <Size>
+                    <AbsDimension x="120" y="24"/>
+                </Size>
+                <Anchors>
+                    <Anchor point="TOP" relativeTo="MCWoWBots_GroupHeader" relativePoint="BOTTOM">
+                        <Offset>
+                            <AbsDimension x="-62" y="-4"/>
+                        </Offset>
+                    </Anchor>
+                </Anchors>
+                <Scripts>
+                    <OnClick>MCWoWBots_FillGroup()</OnClick>
+                </Scripts>
+            </Button>
+
+            <!-- Fill Raid Button -->
+            <Button name="MCWoWBots_FillRaidBtn" inherits="UIPanelButtonTemplate" text="Fill Raid (40)">
+                <Size>
+                    <AbsDimension x="120" y="24"/>
+                </Size>
+                <Anchors>
+                    <Anchor point="LEFT" relativeTo="MCWoWBots_FillGroupBtn" relativePoint="RIGHT">
+                        <Offset>
+                            <AbsDimension x="4" y="0"/>
+                        </Offset>
+                    </Anchor>
+                </Anchors>
+                <Scripts>
+                    <OnClick>MCWoWBots_FillRaid()</OnClick>
+                </Scripts>
+            </Button>
+
+            <!-- Setup Section Header -->
+            <Frame name="MCWoWBots_SetupHeader">
+                <Size>
+                    <AbsDimension x="250" y="16"/>
+                </Size>
+                <Anchors>
+                    <Anchor point="TOP" relativeTo="MCWoWBots_FillGroupBtn" relativePoint="BOTTOM">
+                        <Offset>
+                            <AbsDimension x="62" y="-8"/>
+                        </Offset>
+                    </Anchor>
+                </Anchors>
+                <Layers>
+                    <Layer level="ARTWORK">
+                        <FontString inherits="GameFontNormal" text="-- Setup --" justifyH="CENTER">
+                            <Anchors>
+                                <Anchor point="CENTER"/>
+                            </Anchors>
+                        </FontString>
+                    </Layer>
+                </Layers>
+            </Frame>
+
+            <!-- Gear All / Init All removed: redundant with Prepare Raid (Raid Prep section
+                 below), which runs init+bis+summon in one click. -->
+
+            <!-- Summon All Button (now anchored directly below the Setup header) -->
+            <Button name="MCWoWBots_SummonBtn" inherits="UIPanelButtonTemplate" text="Summon All">
+                <Size>
+                    <AbsDimension x="120" y="24"/>
+                </Size>
+                <Anchors>
+                    <Anchor point="TOP" relativeTo="MCWoWBots_SetupHeader" relativePoint="BOTTOM">
+                        <Offset>
+                            <AbsDimension x="-62" y="-4"/>
+                        </Offset>
+                    </Anchor>
+                </Anchors>
+                <Scripts>
+                    <OnClick>MCWoWBots_SummonAll()</OnClick>
+                </Scripts>
+            </Button>
+
+            <!-- Remove All Button -->
+            <Button name="MCWoWBots_RemoveBtn" inherits="UIPanelButtonTemplate" text="Remove All">
+                <Size>
+                    <AbsDimension x="120" y="24"/>
+                </Size>
+                <Anchors>
+                    <Anchor point="LEFT" relativeTo="MCWoWBots_SummonBtn" relativePoint="RIGHT">
+                        <Offset>
+                            <AbsDimension x="4" y="0"/>
+                        </Offset>
+                    </Anchor>
+                </Anchors>
+                <Scripts>
+                    <OnClick>MCWoWBots_RemoveAll()</OnClick>
+                </Scripts>
+            </Button>
+
+            <!-- Roles section removed: "Smart Roles" in the Raid Prep section assigns
+                 tanks/healers automatically based on class composition, making the manual
+                 Set Tanks / Set Healers buttons redundant. -->
+
+            <!-- Commands Section Header -->
+            <Frame name="MCWoWBots_CmdHeader">
+                <Size>
+                    <AbsDimension x="250" y="16"/>
+                </Size>
+                <Anchors>
+                    <Anchor point="TOP" relativeTo="MCWoWBots_SummonBtn" relativePoint="BOTTOM">
+                        <Offset>
+                            <AbsDimension x="62" y="-8"/>
+                        </Offset>
+                    </Anchor>
+                </Anchors>
+                <Layers>
+                    <Layer level="ARTWORK">
+                        <FontString inherits="GameFontNormal" text="-- Commands --" justifyH="CENTER">
+                            <Anchors>
+                                <Anchor point="CENTER"/>
+                            </Anchors>
+                        </FontString>
+                    </Layer>
+                </Layers>
+            </Frame>
+
+            <!-- Attack Button -->
+            <Button name="MCWoWBots_AttackBtn" inherits="UIPanelButtonTemplate" text="Attack!">
+                <Size>
+                    <AbsDimension x="78" y="24"/>
+                </Size>
+                <Anchors>
+                    <Anchor point="TOP" relativeTo="MCWoWBots_CmdHeader" relativePoint="BOTTOM">
+                        <Offset>
+                            <AbsDimension x="-83" y="-4"/>
+                        </Offset>
+                    </Anchor>
+                </Anchors>
+                <Scripts>
+                    <OnClick>MCWoWBots_Attack()</OnClick>
+                </Scripts>
+            </Button>
+
+            <!-- Follow Button -->
+            <Button name="MCWoWBots_FollowBtn" inherits="UIPanelButtonTemplate" text="Follow!">
+                <Size>
+                    <AbsDimension x="78" y="24"/>
+                </Size>
+                <Anchors>
+                    <Anchor point="LEFT" relativeTo="MCWoWBots_AttackBtn" relativePoint="RIGHT">
+                        <Offset>
+                            <AbsDimension x="4" y="0"/>
+                        </Offset>
+                    </Anchor>
+                </Anchors>
+                <Scripts>
+                    <OnClick>MCWoWBots_Follow()</OnClick>
+                </Scripts>
+            </Button>
+
+            <!-- Stop Button -->
+            <Button name="MCWoWBots_StopBtn" inherits="UIPanelButtonTemplate" text="Stop!">
+                <Size>
+                    <AbsDimension x="78" y="24"/>
+                </Size>
+                <Anchors>
+                    <Anchor point="LEFT" relativeTo="MCWoWBots_FollowBtn" relativePoint="RIGHT">
+                        <Offset>
+                            <AbsDimension x="4" y="0"/>
+                        </Offset>
+                    </Anchor>
+                </Anchors>
+                <Scripts>
+                    <OnClick>MCWoWBots_Stop()</OnClick>
+                </Scripts>
+            </Button>
+
+            <!-- ============= RAID PREP SECTION ============= -->
+            <!-- Anchored AFTER all the Commands buttons (Attack/Follow/Stop row).
+                 Prepare Raid: full setup pipeline in one click.
+                 Smart Roles: auto-assign tanks/healers based on raid composition.
+                 Revive All: bring back dead bots; disabled while master is in combat. -->
+            <Frame name="MCWoWBots_RaidHeader">
+                <Size>
+                    <AbsDimension x="250" y="16"/>
+                </Size>
+                <Anchors>
+                    <Anchor point="TOP" relativeTo="MCWoWBots_AttackBtn" relativePoint="BOTTOM">
+                        <Offset>
+                            <AbsDimension x="83" y="-8"/>
+                        </Offset>
+                    </Anchor>
+                </Anchors>
+                <Layers>
+                    <Layer level="ARTWORK">
+                        <FontString inherits="GameFontNormal" text="-- Raid Prep --" justifyH="CENTER">
+                            <Anchors>
+                                <Anchor point="CENTER"/>
+                            </Anchors>
+                        </FontString>
+                    </Layer>
+                </Layers>
+            </Frame>
+
+            <Button name="MCWoWBots_PrepBtn" inherits="UIPanelButtonTemplate" text="Prepare Raid">
+                <Size>
+                    <AbsDimension x="120" y="24"/>
+                </Size>
+                <Anchors>
+                    <Anchor point="TOP" relativeTo="MCWoWBots_RaidHeader" relativePoint="BOTTOM">
+                        <Offset>
+                            <AbsDimension x="-62" y="-4"/>
+                        </Offset>
+                    </Anchor>
+                </Anchors>
+                <Scripts>
+                    <OnClick>MCWoWBots_PrepareRaid()</OnClick>
+                </Scripts>
+            </Button>
+
+            <Button name="MCWoWBots_SmartRolesBtn" inherits="UIPanelButtonTemplate" text="Smart Roles">
+                <Size>
+                    <AbsDimension x="120" y="24"/>
+                </Size>
+                <Anchors>
+                    <Anchor point="LEFT" relativeTo="MCWoWBots_PrepBtn" relativePoint="RIGHT">
+                        <Offset>
+                            <AbsDimension x="4" y="0"/>
+                        </Offset>
+                    </Anchor>
+                </Anchors>
+                <Scripts>
+                    <OnClick>MCWoWBots_SmartRoles()</OnClick>
+                </Scripts>
+            </Button>
+
+            <!-- "Apply Resist" — opens a four-button popup picker (Fire / Frost / Nature / Shadow).
+                 Single button keeps the main panel clean; the popup is anchored under it and
+                 only shows when clicked. Picker is built in lua (MCWoWBots_ToggleResistPicker).
+                 Use AFTER Prepare Raid, BEFORE entering the relevant raid:
+                   Fire   -> MC, Onyxia
+                   Frost  -> Naxx (Sapphiron, KT)
+                   Nature -> AQ (Huhuran), Hydraxian
+                   Shadow -> Naxx (Four Horsemen) -->
+            <Button name="MCWoWBots_FireResBtn" inherits="UIPanelButtonTemplate" text="Apply Resist">
+                <Size>
+                    <AbsDimension x="120" y="24"/>
+                </Size>
+                <Anchors>
+                    <Anchor point="TOPLEFT" relativeTo="MCWoWBots_PrepBtn" relativePoint="BOTTOMLEFT">
+                        <Offset>
+                            <AbsDimension x="0" y="-4"/>
+                        </Offset>
+                    </Anchor>
+                </Anchors>
+                <Scripts>
+                    <OnClick>MCWoWBots_ToggleResistPicker()</OnClick>
+                </Scripts>
+            </Button>
+
+            <Button name="MCWoWBots_ReviveBtn" inherits="UIPanelButtonTemplate" text="Revive All">
+                <Size>
+                    <AbsDimension x="120" y="24"/>
+                </Size>
+                <Anchors>
+                    <Anchor point="LEFT" relativeTo="MCWoWBots_FireResBtn" relativePoint="RIGHT">
+                        <Offset>
+                            <AbsDimension x="4" y="0"/>
+                        </Offset>
+                    </Anchor>
+                </Anchors>
+                <Scripts>
+                    <OnClick>MCWoWBots_ReviveAll()</OnClick>
+                    <OnUpdate>
+                        if UnitAffectingCombat("player") then
+                            this:Disable()
+                        else
+                            this:Enable()
+                        end
+                    </OnUpdate>
+                </Scripts>
+            </Button>
+
+            <!-- Teleport Section Header. Anchored to FireResBtn BOTTOMRIGHT so the header
+                 sits centered between the FireRes + Revive buttons on the row above
+                 (each is 120w, gap 4, so BOTTOMRIGHT of FireRes is the centerline). -->
+            <Frame name="MCWoWBots_TeleHeader">
+                <Size>
+                    <AbsDimension x="250" y="16"/>
+                </Size>
+                <Anchors>
+                    <Anchor point="TOP" relativeTo="MCWoWBots_FireResBtn" relativePoint="BOTTOMRIGHT">
+                        <Offset>
+                            <AbsDimension x="2" y="-8"/>
+                        </Offset>
+                    </Anchor>
+                </Anchors>
+                <Layers>
+                    <Layer level="ARTWORK">
+                        <FontString inherits="GameFontNormal" text="-- Instance Teleport --" justifyH="CENTER">
+                            <Anchors>
+                                <Anchor point="CENTER"/>
+                            </Anchors>
+                        </FontString>
+                    </Layer>
+                </Layers>
+            </Frame>
+        </Frames>
+        <Scripts>
+            <OnMouseDown>
+                if arg1 == "LeftButton" then
+                    this:StartMoving()
+                end
+            </OnMouseDown>
+            <OnMouseUp>
+                this:StopMovingOrSizing()
+            </OnMouseUp>
+            <OnHide>
+                this:StopMovingOrSizing()
+            </OnHide>
+        </Scripts>
+    </Frame>
+
+    <!-- Minimap Button -->
+    <Button name="MCWoWBots_MinimapBtn" parent="Minimap" enableMouse="true" movable="true" hidden="false">
+        <Size>
+            <AbsDimension x="33" y="33"/>
+        </Size>
+        <Anchors>
+            <Anchor point="TOPLEFT" relativeTo="Minimap" relativePoint="TOPLEFT">
+                <Offset>
+                    <AbsDimension x="2" y="-2"/>
+                </Offset>
+            </Anchor>
+        </Anchors>
+        <Layers>
+            <Layer level="BACKGROUND">
+                <Texture name="MCWoWBots_MinimapBtnIcon" file="Interface\Icons\Ability_Hunter_BeastCall">
+                    <Size>
+                        <AbsDimension x="21" y="21"/>
+                    </Size>
+                    <Anchors>
+                        <Anchor point="CENTER"/>
+                    </Anchors>
+                </Texture>
+            </Layer>
+            <Layer level="OVERLAY">
+                <Texture file="Interface\Minimap\MiniMap-TrackingBorder">
+                    <Size>
+                        <AbsDimension x="56" y="56"/>
+                    </Size>
+                    <Anchors>
+                        <Anchor point="TOPLEFT"/>
+                    </Anchors>
+                </Texture>
+            </Layer>
+        </Layers>
+        <HighlightTexture file="Interface\Minimap\UI-Minimap-ZoomButton-Highlight" alphaMode="ADD"/>
+        <Scripts>
+            <OnClick>MCWoWBots_Toggle()</OnClick>
+            <OnEnter>
+                GameTooltip:SetOwner(this, "ANCHOR_LEFT")
+                GameTooltip:AddLine("MCWoW Bot Manager")
+                GameTooltip:AddLine("Click to toggle panel", 1, 1, 1)
+                GameTooltip:Show()
+            </OnEnter>
+            <OnLeave>GameTooltip:Hide()</OnLeave>
+        </Scripts>
+    </Button>
+
+</Ui>

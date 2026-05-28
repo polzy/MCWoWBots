@@ -1,0 +1,9 @@
+## Interface: 11200
+## Title: MCWoW Bot Manager
+## Notes: Manage playerbots - groups, raids, gear, roles. https://github.com/polzy/MCWoWBots
+## Author: MCWoW
+## Version: 1.0.0
+## X-Website: https://github.com/polzy/MCWoWBots
+## X-Compatible-With: Turtle WoW 1.18.1
+MCWoWBots.xml
+MCWoWBots.lua
