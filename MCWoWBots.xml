@@ -397,15 +397,17 @@
         </Scripts>
     </Frame>
 
-    <!-- Minimap Button -->
+    <!-- Minimap Button — anchored TOPRIGHT by default (TOPLEFT was conflicting
+         with other addons that also default-anchor there). Movable via
+         right-button drag once in game; position is saved in MCWoWBotsDB. -->
     <Button name="MCWoWBots_MinimapBtn" parent="Minimap" enableMouse="true" movable="true" hidden="false">
         <Size>
             <AbsDimension x="33" y="33"/>
         </Size>
         <Anchors>
-            <Anchor point="TOPLEFT" relativeTo="Minimap" relativePoint="TOPLEFT">
+            <Anchor point="TOPRIGHT" relativeTo="Minimap" relativePoint="TOPRIGHT">
                 <Offset>
-                    <AbsDimension x="2" y="-2"/>
+                    <AbsDimension x="-4" y="-78"/>
                 </Offset>
             </Anchor>
         </Anchors>
@@ -433,7 +435,7 @@
         </Layers>
         <HighlightTexture file="Interface\Minimap\UI-Minimap-ZoomButton-Highlight" alphaMode="ADD"/>
         <Scripts>
-            <OnClick>MCWoWBots_Toggle()</OnClick>
+            <OnClick>if MCWoWBotsV2_Toggle then MCWoWBotsV2_Toggle() else MCWoWBots_Toggle() end</OnClick>
             <OnEnter>
                 GameTooltip:SetOwner(this, "ANCHOR_LEFT")
                 GameTooltip:AddLine("MCWoW Bot Manager")
