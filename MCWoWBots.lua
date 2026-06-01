@@ -262,14 +262,18 @@ function MCWoWBots_SmartRoles()
 
     local tankCount, mtHealCount, raidHealCount = 0, 0, 0
 
-    -- 2 Main Tanks (warriors).
-    for i = 1, math.min(2, table.getn(warriors)) do
+    -- Scale targets to group size. Smart Roles always wants ~half the cap as
+    -- dedicated MT-healers and the rest as raid-healers.
+    local capTanks, capHealers, totalGroup = ComputeCaps()
+    local mtHealersWanted = math.max(1, math.floor(capHealers / 3))  -- ~3 for 40-man, 2 for 20-man, 1 for 10-man
+
+    -- Main Tanks (warriors).
+    for i = 1, math.min(capTanks, table.getn(warriors)) do
         SendCmd(".bot c " .. warriors[i].name .. " tank set")
         tankCount = tankCount + 1
     end
 
-    -- 3 Main Tank Healers: prefer paladins (better single-target heal in vanilla via FoL spam).
-    local mtHealersWanted = 3
+    -- Main Tank Healers: prefer paladins (better single-target heal in vanilla via FoL spam).
     for i = 1, math.min(mtHealersWanted, table.getn(paladins)) do
         SendCmd(".bot c " .. paladins[i].name .. " heal tank set")
         mtHealCount = mtHealCount + 1
@@ -282,18 +286,23 @@ function MCWoWBots_SmartRoles()
         priestIdx = priestIdx + 1
     end
 
-    -- Raid Healers: remaining priests + remaining paladins.
+    -- Raid Healers: remaining priests + remaining paladins, capped at
+    -- (capHealers - MT-healers). Extras stay DPS so the raid keeps damage output.
+    local raidHealersWanted = math.max(0, capHealers - mtHealCount)
     for i = priestIdx, table.getn(priests) do
+        if raidHealCount >= raidHealersWanted then break end
         SendCmd(".bot c " .. priests[i].name .. " heal raid set")
         raidHealCount = raidHealCount + 1
     end
     for i = mtHealersWanted + 1, table.getn(paladins) do
+        if raidHealCount >= raidHealersWanted then break end
         SendCmd(".bot c " .. paladins[i].name .. " heal raid set")
         raidHealCount = raidHealCount + 1
     end
 
-    MCWoWBots_Print(string.format("|cff00ff00Smart Roles: %d tanks, %d MT heals, %d raid heals|r",
-        tankCount, mtHealCount, raidHealCount))
+    MCWoWBots_Print(string.format(
+        "|cff00ff00Smart Roles: %d tanks, %d MT heals, %d raid heals (group %d → tank cap %d, heal cap %d)|r",
+        tankCount, mtHealCount, raidHealCount, totalGroup, capTanks, capHealers))
 end
 
 -- Revive all dead bots in the current group/raid.
@@ -323,13 +332,32 @@ end
 -- ============================================================
 -- Button handlers: Roles
 -- ============================================================
--- MC raid layout sanity caps. Putting every warrior as tank (8+ tanks) wastes
--- DPS and confuses threat. Standard 40-man MC = 1 MT + 2-3 OT, rest DPS.
--- Standard healer count = 8-10. Bots above the cap stay at their default DPS
--- role and contribute damage. User can still manually `.bot c <name> tank set`
--- if they want extras.
-local MAX_TANKS = 4    -- 1 MT + 3 OT
-local MAX_HEALERS = 10 -- typical 40-man MC healer count
+-- Raid composition caps scaled to group size. Putting every warrior as tank
+-- (8+ tanks) wastes DPS and confuses threat targeting. The right number of
+-- tanks/healers depends on raid size:
+--
+--   5-man dungeon  : 1 tank, 1 healer
+--   10-man (UBRS,..): 2 tanks, 3 healers
+--   20-man (ZG,AQ20): 3 tanks, 6 healers
+--   40-man (MC,BWL,
+--     AQ40, Naxx)  : 4 tanks, 10 healers   (Naxx Four Horsemen wants 4!)
+--
+-- Bots above the cap stay at their default role (DPS for extra warriors =
+-- fury/arms; extra priests = shadow; extra paladins = ret). User can still
+-- manually `.bot c <name> tank set` to add more if a specific encounter
+-- demands it (e.g. AQ40 Twin Emperors needs 4-5 tanks total).
+local function ComputeCaps()
+    local raidSize = GetNumRaidMembers() or 0
+    local groupSize = (GetNumPartyMembers() or 0) + 1
+    local total = (raidSize > 0) and raidSize or groupSize
+    local tanks, healers
+    if total >= 30 then       tanks, healers = 4, 10  -- 40-man raid
+    elseif total >= 15 then   tanks, healers = 3,  6  -- 20-man raid
+    elseif total >= 6  then   tanks, healers = 2,  3  -- 10-man
+    else                      tanks, healers = 1,  1  -- 5-man / solo
+    end
+    return tanks, healers, total
+end
 
 function MCWoWBots_SetTanks()
     -- Assign tank role to up to MAX_TANKS highest-level warriors. Others stay DPS.
@@ -355,13 +383,14 @@ function MCWoWBots_SetTanks()
         end
     end
     table.sort(warriors, function(a, b) return a.lvl > b.lvl end)
-    local cap = math.min(MAX_TANKS, table.getn(warriors))
+    local maxTanks, _, totalGroup = ComputeCaps()
+    local cap = math.min(maxTanks, table.getn(warriors))
     for i = 1, cap do
         SendCmd(".bot c " .. warriors[i].name .. " tank set")
     end
     local extras = table.getn(warriors) - cap
-    MCWoWBots_Print(string.format("Set %d warrior(s) as tank (capped at %d; %d remaining warrior(s) stay DPS).",
-        cap, MAX_TANKS, extras))
+    MCWoWBots_Print(string.format("Set %d warrior(s) as tank (group size %d → cap %d; %d remaining warrior(s) stay DPS).",
+        cap, totalGroup, maxTanks, extras))
 end
 
 function MCWoWBots_SetHealers()
@@ -391,13 +420,14 @@ function MCWoWBots_SetHealers()
         end
     end
     table.sort(healers, function(a, b) return a.lvl > b.lvl end)
-    local cap = math.min(MAX_HEALERS, table.getn(healers))
+    local _, maxHealers, totalGroup = ComputeCaps()
+    local cap = math.min(maxHealers, table.getn(healers))
     for i = 1, cap do
         SendCmd(".bot c " .. healers[i].name .. " heal set")
     end
     local extras = table.getn(healers) - cap
-    MCWoWBots_Print(string.format("Set %d healer(s) (capped at %d; %d remaining priest/paladin stay DPS).",
-        cap, MAX_HEALERS, extras))
+    MCWoWBots_Print(string.format("Set %d healer(s) (group size %d → cap %d; %d remaining priest/paladin stay DPS).",
+        cap, totalGroup, maxHealers, extras))
 end
 
 -- ============================================================
