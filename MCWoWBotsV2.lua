@@ -360,10 +360,26 @@ rosterScroll:SetPoint("TOPLEFT", rosterPanel, "TOPLEFT", 0, -4)
 rosterScroll:SetPoint("BOTTOMRIGHT", rosterPanel, "BOTTOMRIGHT", -22, 0)
 
 local function NewRosterRow(i)
-    local row = CreateFrame("Frame", FRAME_NAME .. "RosterRow" .. i, rosterPanel)
+    -- Button so we can wire OnClick → target. Frames don't take clicks
+    -- by default; Button does.
+    local row = CreateFrame("Button", FRAME_NAME .. "RosterRow" .. i, rosterPanel)
     row:SetWidth(FRAME_W - 70)
     row:SetHeight(ROSTER_ROW_H)
     row:SetPoint("TOPLEFT", rosterScroll, "TOPLEFT", 0, -((i - 1) * ROSTER_ROW_H))
+    row:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    row:SetScript("OnClick", function()
+        if not row.unitId then return end
+        if arg1 == "RightButton" then
+            -- Right-click on a bot we're tracking opens the Strategy tab.
+            local name = UnitName(row.unitId)
+            if name and MCWoWBotsStatus and MCWoWBotsStatus.botData and MCWoWBotsStatus.botData[name] then
+                MCWoWBotsV2_FocusStrategy(name)
+                SwitchTab("strategy")
+            end
+        else
+            TargetUnit(row.unitId)
+        end
+    end)
 
     if math.mod(i, 2) == 0 then
         local bg = row:CreateTexture(nil, "BACKGROUND")
@@ -452,6 +468,7 @@ local function RefreshRoster()
         local row = rosterRows[i]
         local u = units[offset + i]
         if u and UnitExists(u) then
+            row.unitId = u
             local name = UnitName(u) or "?"
             local _, class = UnitClass(u)
             local lvl = UnitLevel(u) or 0
@@ -484,6 +501,7 @@ local function RefreshRoster()
             end
             row:Show()
         else
+            row.unitId = nil
             row:Hide()
         end
     end
