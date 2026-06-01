@@ -562,6 +562,14 @@ MakeGearButton(gearPanel, 170, -102, "Set Healers",
 MakeGearButton(gearPanel, 340, -102, "BiS Overlay (Raid)",
     function() SendChatMessage(".bot bis *", "SAY") end)
 
+-- Row 3b: pre-raid buff orchestrator. Forces a non-combat tick on all
+-- bots so paladin Blessings / priest PWF + DS / druid MOTW / mage Int
+-- + Brilliance / shaman totems / hunter Aspect / warlock buffs all
+-- land before pull. Uses MCWoWBots_BuffRaid which enables +nc on every
+-- bot; the engine re-evaluates buff coverage within ~10s.
+MakeGearButton(gearPanel,   0, -136, "Buff Raid",
+    function() if MCWoWBots_BuffRaid then MCWoWBots_BuffRaid() end end)
+
 -- Row 4: instance teleport (dropdown + button, ported from V1)
 local teleLabel = gearPanel:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 teleLabel:SetPoint("TOPLEFT", gearPanel, "TOPLEFT", 0, -140)

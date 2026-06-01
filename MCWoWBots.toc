@@ -5,7 +5,7 @@
 ## Version: 1.1.0
 ## X-Website: https://github.com/polzy/MCWoWBots
 ## X-Compatible-With: Turtle WoW 1.18.1
-## SavedVariables: MCWoWBotsV2DB
+## SavedVariables: MCWoWBotsV2DB, MCWoWBotsLastResistMap
 MCWoWBots.xml
 MCWoWBots.lua
 MCWoWBotsStatus.lua

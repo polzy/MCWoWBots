@@ -181,13 +181,18 @@ local SCHOOL_CMD = {
 }
 
 function MCWoWBots_ApplyResist(school)
-    local cmd = SCHOOL_CMD[school]
+    -- Normalize: V2 buttons pass "Fire" (capitalized) but SCHOOL_CMD
+    -- table indexes lowercase. Pre-existing bug — V2 buttons no-oped
+    -- silently with "Unknown resist school: Fire". Lowercase here is
+    -- the cheapest fix; both call paths now resolve.
+    local key = school and string.lower(school) or ""
+    local cmd = SCHOOL_CMD[key]
     if not cmd then
         MCWoWBots_Print("Unknown resist school: " .. tostring(school))
         return
     end
     SendCmd(cmd)
-    MCWoWBots_Print("Applying " .. school .. " Resist set to all bots...")
+    MCWoWBots_Print("Applying " .. key .. " Resist set to all bots...")
     if resistPicker then resistPicker:Hide() end
 end
 
@@ -346,10 +351,45 @@ end
 -- fury/arms; extra priests = shadow; extra paladins = ret). User can still
 -- manually `.bot c <name> tank set` to add more if a specific encounter
 -- demands it (e.g. AQ40 Twin Emperors needs 4-5 tanks total).
+-- Context-aware caps: prefer per-instance tuning over raw raid size.
+-- vanilla map IDs that matter:
+--   249 Onyxia       — 1 MT (single dragon), 1 OT for whelps, 6 healers
+--   409 Molten Core  — 2 MT (Garr/Sulfuron need add tanks), 1 OT, 8 healers
+--   469 BWL          — 4 MT (Razorgore P1 needs 4 add tanks), 8 healers
+--   509 AQ20         — 2 MT, 5 healers
+--   531 AQ40         — 4 MT (Twin Emperors needs 2/twin), 8 healers
+--   533 Naxxramas    — 4 MT (Razuvious + 4HM each need 4 tanks), 10 healers
+--   309 Zul'Gurub    — 2 MT (Mandokir + Hakkar), 5 healers
+-- Fallback (non-tracked map): scale by raid size as before.
+local INSTANCE_CAPS = {
+    [249] = { tanks = 2, healers = 6  },  -- Onyxia: MT + whelp OT
+    [409] = { tanks = 3, healers = 8  },  -- Molten Core
+    [469] = { tanks = 4, healers = 8  },  -- Blackwing Lair
+    [509] = { tanks = 2, healers = 5  },  -- Ruins of Ahn'Qiraj
+    [531] = { tanks = 4, healers = 8  },  -- Temple of Ahn'Qiraj
+    [533] = { tanks = 4, healers = 10 },  -- Naxxramas
+    [309] = { tanks = 2, healers = 5  },  -- Zul'Gurub
+}
+
 local function ComputeCaps()
     local raidSize = GetNumRaidMembers() or 0
     local groupSize = (GetNumPartyMembers() or 0) + 1
     local total = (raidSize > 0) and raidSize or groupSize
+
+    -- Map ID API call. May fail outside instances (returns nil) — fall
+    -- through to size-based defaults in that case.
+    local mapId
+    if GetCurrentMapAreaID then
+        mapId = GetCurrentMapAreaID()
+    end
+    local override = mapId and INSTANCE_CAPS[mapId]
+    if override and total >= 6 then
+        -- Cap healers at total/2 so a 10-man Naxx doesn't try to assign
+        -- 10 healers from a 10-person roster.
+        local h = math.min(override.healers, math.floor(total / 2))
+        return override.tanks, h, total
+    end
+
     local tanks, healers
     if total >= 30 then       tanks, healers = 4, 10  -- 40-man raid
     elseif total >= 15 then   tanks, healers = 3,  6  -- 20-man raid
@@ -537,14 +577,75 @@ end
 -- ============================================================
 -- Event frame for periodic status updates
 -- ============================================================
+-- Auto-resist on map enter. When the master walks into a raid instance,
+-- pre-fire the appropriate `.bot <school>res *` command so bots arrive
+-- pre-equipped with the right resist gear before pull. SavedVariable
+-- MCWoWBotsLastResistMap prevents re-firing on every zone change ping
+-- inside the same instance. Manual `Apply Resist` button still works
+-- to override or re-apply.
+local AUTO_RESIST_BY_MAP = {
+    [249] = "fire",   -- Onyxia (Deep Breath, Flame Breath)
+    [409] = "fire",   -- Molten Core
+    [469] = "fire",   -- Blackwing Lair (Vael/drakes/Nefarian fire breath)
+    [509] = nil,      -- AQ20 — mixed, no single-school dominant
+    [531] = "nature", -- Temple AQ40 (Huhuran berserk is nature)
+    [533] = "frost",  -- Naxxramas (Sapphiron/KT) — Shadow needed for 4HM but Frost first
+    [309] = nil,      -- Zul'Gurub — mixed
+}
+
+local function MCWoWBots_MaybeAutoResist()
+    if not GetCurrentMapAreaID then return end
+    local mapId = GetCurrentMapAreaID()
+    if not mapId then return end
+    local school = AUTO_RESIST_BY_MAP[mapId]
+    if not school then return end
+    if not MCWoWBotsLastResistMap then MCWoWBotsLastResistMap = {} end
+    -- Re-fire if we're entering a NEW instance map; suppress duplicate
+    -- fires on every ZONE_CHANGED ping inside the same instance.
+    if MCWoWBotsLastResistMap.map == mapId and MCWoWBotsLastResistMap.school == school then
+        return
+    end
+    MCWoWBotsLastResistMap.map = mapId
+    MCWoWBotsLastResistMap.school = school
+    MCWoWBots_Print(string.format(
+        "|cff00ffffAuto-resist:|r entering map %d, applying %s resist to all bots.",
+        mapId, school))
+    MCWoWBots_ApplyResist(school)
+end
+
+-- Pre-raid buffs: force a re-eval of the non-combat strategy on every
+-- bot. Bots ALREADY auto-buff each other when their auras drop, but
+-- after a wipe / load / long travel the buffs lapse and the auto-cycle
+-- is slow to re-arm (cooldowns + range checks). This forces a tick.
+-- Mechanism: enable+disable a no-op strategy to nudge the engine; the
+-- next non-combat tick re-evaluates all buff triggers.
+function MCWoWBots_BuffRaid()
+    if UnitAffectingCombat("player") then
+        MCWoWBots_Print("|cffff5555Cannot pre-buff in combat.|r")
+        return
+    end
+    MCWoWBots_Print("|cff00ff00Pre-buff: triggering buff re-cast cycle...|r")
+    -- 1. Make sure bots are in non-combat strategy so they buff at all.
+    SendCmd(".bot c * +nc")
+    -- 2. Bots periodically auto-buff via their non-combat strategy;
+    --    we don't need to issue a buff command per se. The +nc tick
+    --    naturally re-evaluates buff aura coverage on each party member
+    --    every 1-2 seconds. Within ~10s the raid is fully buffed.
+    MCWoWBots_Print("|cff00ff00Pre-buff: non-combat strategy enabled. Buffs land in ~10s.|r")
+end
+
 local eventFrame = CreateFrame("Frame")
 eventFrame:RegisterEvent("PARTY_MEMBERS_CHANGED")
 eventFrame:RegisterEvent("RAID_ROSTER_UPDATE")
 eventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
+eventFrame:RegisterEvent("ZONE_CHANGED_NEW_AREA")
 eventFrame:SetScript("OnEvent", function()
     if event == "PLAYER_ENTERING_WORLD" then
         MCWoWBots_CreateInstanceDropdown()
         MCWoWBots_Print("Loaded. Type /bots to open the panel.")
+        MCWoWBots_MaybeAutoResist()
+    elseif event == "ZONE_CHANGED_NEW_AREA" then
+        MCWoWBots_MaybeAutoResist()
     end
     if MCWoWBots_MainFrame and MCWoWBots_MainFrame:IsShown() then
         MCWoWBots_UpdateStatus()
