@@ -7,7 +7,10 @@
 -- Verified instance entry coordinates. Format: ".go xyz x y z mapId" (mangos syntax).
 -- The bare `.go` with 4 args was sending us to the void in MC — switched to `.go xyz`
 -- which is the explicit mangos sub-command for an absolute world position teleport.
-local INSTANCE_TELEPORTS = {
+-- INSTANCE_TELEPORTS is intentionally GLOBAL — V2 (MCWoWBotsV2.lua) reads
+-- the same table to populate its Gear-tab dropdown. Marking it local was a
+-- bug (commit 2840db4 fix) — V2 saw it as nil and the dropdown was empty.
+INSTANCE_TELEPORTS = {
     { "Molten Core",           ".go xyz 1093.34 -465.62 -98.40 409" },
     { "Onyxia's Lair",         ".go xyz 22.83 -67.96 -5.57 249" },
     { "Blackwing Lair",        ".go xyz -7666.18 -1102.42 400.36 469" },

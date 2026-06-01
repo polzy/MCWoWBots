@@ -596,9 +596,22 @@ MakeGearButton(gearPanel, 320, -136, "Teleport", function()
     end
 end)
 
+-- Row 5: bot squad ops (summon/remove/follow/stop) — feature-parity with V1.
+-- These wrap the same V1 entry points so the .bot commands stay consistent.
+MakeGearButton(gearPanel,   0, -170, "Summon All Bots",
+    function() if MCWoWBots_SummonAll then MCWoWBots_SummonAll() end end)
+MakeGearButton(gearPanel, 170, -170, "Remove All Bots",
+    function() if MCWoWBots_RemoveAll then MCWoWBots_RemoveAll() end end)
+MakeGearButton(gearPanel, 340, -170, "Attack My Target",
+    function() if MCWoWBots_Attack then MCWoWBots_Attack() end end)
+MakeGearButton(gearPanel,   0, -204, "Follow Me",
+    function() if MCWoWBots_Follow then MCWoWBots_Follow() end end)
+MakeGearButton(gearPanel, 170, -204, "Stop / Stay",
+    function() if MCWoWBots_Stop then MCWoWBots_Stop() end end)
+
 -- Help text
 local gearHelp = gearPanel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-gearHelp:SetPoint("TOPLEFT", gearPanel, "TOPLEFT", 0, -180)
+gearHelp:SetPoint("TOPLEFT", gearPanel, "TOPLEFT", 0, -240)
 gearHelp:SetPoint("BOTTOMRIGHT", gearPanel, "BOTTOMRIGHT", 0, 0)
 gearHelp:SetJustifyH("LEFT")
 gearHelp:SetJustifyV("TOP")
