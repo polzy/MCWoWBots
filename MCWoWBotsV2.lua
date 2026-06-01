@@ -181,17 +181,41 @@ local function NewCombatRow(i)
     row.state:SetWidth(96)
     row.state:SetJustifyH("LEFT")
 
+    -- Mini HP bar between state and target. Background then fill texture.
+    row.hpbg = row:CreateTexture(nil, "BORDER")
+    row.hpbg:SetTexture(0.15, 0.15, 0.15, 0.8)
+    row.hpbg:SetPoint("LEFT", row.state, "RIGHT", 4, 0)
+    row.hpbg:SetWidth(70)
+    row.hpbg:SetHeight(10)
+
+    row.hp = row:CreateTexture(nil, "ARTWORK")
+    row.hp:SetPoint("LEFT", row.hpbg, "LEFT", 1, 0)
+    row.hp:SetHeight(8)
+
+    row.hpText = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    row.hpText:SetPoint("LEFT", row.hpbg, "LEFT", 0, 0)
+    row.hpText:SetPoint("RIGHT", row.hpbg, "RIGHT", 0, 0)
+    row.hpText:SetJustifyH("CENTER")
+    row.hpText:SetTextColor(1, 1, 1)
+
     row.target = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    row.target:SetPoint("LEFT", row.state, "RIGHT", 4, 0)
+    row.target:SetPoint("LEFT", row.hpbg, "RIGHT", 4, 0)
     row.target:SetPoint("RIGHT", row, "RIGHT", -4, 0)
     row.target:SetJustifyH("LEFT")
     row.target:SetTextColor(1, 0.82, 0)
 
-    -- Clicking a row puts that bot in the Strategy tab.
+    -- LeftClick: TARGET the bot in-game (UnitID lookup via raid scan).
+    -- RightClick: focus this bot in the Strategy tab.
+    row:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     row:SetScript("OnClick", function()
-        if row.botName then
+        if not row.botName then return end
+        if arg1 == "RightButton" then
             MCWoWBotsV2_FocusStrategy(row.botName)
             SwitchTab("strategy")
+        else
+            -- Try TargetByName which vanilla 1.12 supports for any player
+            -- in the same raid/zone. Falls back silently if name not found.
+            TargetByName(row.botName, true)
         end
     end)
 
@@ -200,6 +224,39 @@ end
 
 for i = 1, COMBAT_NUM_ROWS do
     combatRows[i] = NewCombatRow(i)
+end
+
+-- Walk raid1..raidN once per refresh and build a name → unitID map.
+-- Cheaper than calling UnitName(raid<i>) inside the per-row loop and
+-- avoids O(rows × raidSize) name compares. Rebuilt every refresh so it
+-- tracks group changes without an event hook.
+local function BuildNameToUnitMap()
+    local map = {}
+    local raidSize = GetNumRaidMembers() or 0
+    if raidSize > 0 then
+        for i = 1, raidSize do
+            local u = "raid" .. i
+            local n = UnitName(u)
+            if n then map[n] = u end
+        end
+    else
+        map[UnitName("player") or ""] = "player"
+        local party = GetNumPartyMembers() or 0
+        for i = 1, party do
+            local u = "party" .. i
+            local n = UnitName(u)
+            if n then map[n] = u end
+        end
+    end
+    return map
+end
+
+local function HPColorRGB_Combat(pct)
+    if pct >= 50 then
+        local t = (pct - 50) / 50
+        return 1 - t, 1, 0
+    end
+    return 1, pct / 50, 0
 end
 
 local function RefreshCombat()
@@ -212,6 +269,8 @@ local function RefreshCombat()
     FauxScrollFrame_Update(combatScroll, total, COMBAT_NUM_ROWS, COMBAT_ROW_H)
     local offset = FauxScrollFrame_GetOffset(combatScroll)
 
+    local nameToUnit = BuildNameToUnitMap()
+
     for i = 1, COMBAT_NUM_ROWS do
         local row = combatRows[i]
         local name = names[offset + i]
@@ -221,11 +280,26 @@ local function RefreshCombat()
             row.name:SetText(name)
             row.state:SetText("[" .. (d.state ~= "" and d.state or "?") .. "]")
             row.state:SetTextColor(StateColor(d.state))
-            -- Combine target + last action in the same right-hand cell so a
-            -- single ‹‹engage razorgore add› on Dragonkin Spawn›› reads as
-            -- one sentence rather than two columns. Action in yellow, target
-            -- in white via the existing color (we set yellow on row.target
-            -- at row creation).
+
+            -- HP bar lookup. Falls back to "??" when the bot isn't in the
+            -- raid view (e.g. master is solo and the bot just despawned).
+            local unit = nameToUnit[name]
+            if unit and UnitExists(unit) then
+                local hpCur = UnitHealth(unit) or 0
+                local hpMax = UnitHealthMax(unit) or 1
+                if hpMax == 0 then hpMax = 1 end
+                local pct = math.floor(hpCur * 100 / hpMax)
+                local barW = 68 * (hpCur / hpMax)
+                if barW < 1 then barW = 1 end
+                row.hp:SetWidth(barW)
+                local hr, hg, hb = HPColorRGB_Combat(pct)
+                row.hp:SetTexture(hr, hg, hb, 0.85)
+                row.hpText:SetText(pct .. "%")
+            else
+                row.hp:SetWidth(1)
+                row.hpText:SetText("?")
+            end
+
             local target = d.target or ""
             local action = d.action or ""
             local right = ""
