@@ -699,8 +699,12 @@ end
 
 -- Append a log entry. Called by the OnUpdate hook below when we detect a
 -- state change on any tracked bot (kept extra-light: no allocations beyond
--- a single string per change).
+-- a single string per change). Defensive: re-init MCWoWBotsV2DB.logs if the
+-- SavedVariables table is somehow nil/missing at call time (e.g. corrupted
+-- save file, addon reload mid-session, /reload race).
 local function AppendLog(line)
+    if not MCWoWBotsV2DB then MCWoWBotsV2DB = {} end
+    if not MCWoWBotsV2DB.logs then MCWoWBotsV2DB.logs = {} end
     table.insert(MCWoWBotsV2DB.logs, line)
     while table.getn(MCWoWBotsV2DB.logs) > 80 do
         table.remove(MCWoWBotsV2DB.logs, 1)
@@ -708,6 +712,8 @@ local function AppendLog(line)
 end
 
 local function RefreshLogs()
+    if not MCWoWBotsV2DB then MCWoWBotsV2DB = {} end
+    if not MCWoWBotsV2DB.logs then MCWoWBotsV2DB.logs = {} end
     local logs = MCWoWBotsV2DB.logs
     local total = table.getn(logs)
     FauxScrollFrame_Update(logsScroll, total, LOG_NUM_ROWS, LOG_ROW_H)
