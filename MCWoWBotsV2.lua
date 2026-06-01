@@ -204,17 +204,22 @@ local function NewCombatRow(i)
     row.target:SetJustifyH("LEFT")
     row.target:SetTextColor(1, 0.82, 0)
 
-    -- LeftClick: TARGET the bot in-game AND focus it in the Strategy tab.
-    --            (Single-click does both — users found the right-click-only
-    --            focus discoverability poor.)
-    -- RightClick: focus only (no target change, useful while keeping a boss
-    --             targeted).
+    -- LeftClick:        target + focus in Strategy tab
+    -- Shift+LeftClick:  send `.bot inspect <name>` SAY command — bypasses
+    --                   vanilla UnitInParty inspect limit; server dumps
+    --                   gear/spec/stats into chat. Most useful action for
+    --                   "show me what this bot has equipped".
+    -- RightClick:       focus only (no target change, useful while keeping
+    --                   a boss targeted).
     row:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     row:SetScript("OnClick", function()
         if not row.botName then return end
         if arg1 == "RightButton" then
             MCWoWBotsV2_FocusStrategy(row.botName)
             SwitchTab("strategy")
+        elseif IsShiftKeyDown() then
+            -- Inspect via SAY → server picks it up as a GM-style .bot cmd.
+            SendChatMessage(".bot inspect " .. row.botName, "SAY")
         else
             -- Try TargetByName which vanilla 1.12 supports for any player
             -- in the same raid/zone. Falls back silently if name not found.
