@@ -335,15 +335,60 @@ MakeGearButton(gearPanel, 340, -34, "Nature Resist",
 MakeGearButton(gearPanel,   0, -68, "Shadow Resist",
     function() if MCWoWBots_ApplyResist then MCWoWBots_ApplyResist("Shadow") end end)
 
--- Row 3: role assignment
+-- Row 3: role assignment + bot ops
 MakeGearButton(gearPanel,   0, -102, "Set Tanks",
     function() if MCWoWBots_SetTanks then MCWoWBots_SetTanks() end end)
 MakeGearButton(gearPanel, 170, -102, "Set Healers",
     function() if MCWoWBots_SetHealers then MCWoWBots_SetHealers() end end)
+-- Force-equip BiS overlay on the whole raid by piping `.bot bis *` through
+-- the existing SAY-as-GM-command channel. The server's BiS command itself
+-- iterates the group; we just trigger it once on the master.
+MakeGearButton(gearPanel, 340, -102, "BiS Overlay (Raid)",
+    function() SendChatMessage(".bot bis *", "SAY") end)
+
+-- Row 4: instance teleport (dropdown + button, ported from V1)
+local teleLabel = gearPanel:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+teleLabel:SetPoint("TOPLEFT", gearPanel, "TOPLEFT", 0, -140)
+teleLabel:SetText("Instance teleport:")
+
+local teleDropdown = CreateFrame("Frame", "MCWoWBotsV2_TeleDropdown", gearPanel, "UIDropDownMenuTemplate")
+teleDropdown:SetPoint("TOPLEFT", gearPanel, "TOPLEFT", 100, -132)
+
+local selectedTeleIdx = 1
+-- INSTANCE_TELEPORTS is defined in MCWoWBots.lua (V1) — we reuse the same
+-- table so updating one keeps both panels consistent.
+local function TeleInit()
+    if not INSTANCE_TELEPORTS then return end
+    for i, data in ipairs(INSTANCE_TELEPORTS) do
+        local info = {}
+        info.text = data[1]
+        info.value = i
+        info.func = function()
+            selectedTeleIdx = this.value
+            UIDropDownMenu_SetSelectedValue(teleDropdown, this.value)
+            UIDropDownMenu_SetText(INSTANCE_TELEPORTS[this.value][1], teleDropdown)
+        end
+        UIDropDownMenu_AddButton(info)
+    end
+end
+UIDropDownMenu_Initialize(teleDropdown, TeleInit)
+UIDropDownMenu_SetWidth(180, teleDropdown)
+if INSTANCE_TELEPORTS and INSTANCE_TELEPORTS[1] then
+    UIDropDownMenu_SetSelectedValue(teleDropdown, 1)
+    UIDropDownMenu_SetText(INSTANCE_TELEPORTS[1][1], teleDropdown)
+end
+
+MakeGearButton(gearPanel, 320, -136, "Teleport", function()
+    if INSTANCE_TELEPORTS and INSTANCE_TELEPORTS[selectedTeleIdx] then
+        local data = INSTANCE_TELEPORTS[selectedTeleIdx]
+        SendChatMessage(data[2], "SAY")
+        DEFAULT_CHAT_FRAME:AddMessage("|cFF00FFFF[MCWB]|r Teleporting to " .. data[1] .. "...")
+    end
+end)
 
 -- Help text
 local gearHelp = gearPanel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-gearHelp:SetPoint("TOPLEFT", gearPanel, "TOPLEFT", 0, -140)
+gearHelp:SetPoint("TOPLEFT", gearPanel, "TOPLEFT", 0, -180)
 gearHelp:SetPoint("BOTTOMRIGHT", gearPanel, "BOTTOMRIGHT", 0, 0)
 gearHelp:SetJustifyH("LEFT")
 gearHelp:SetJustifyV("TOP")
@@ -352,10 +397,13 @@ gearHelp:SetText(
     "Bulk actions:\n" ..
     "  Prepare Raid  - .bot init+bis+frostres on every bot in raid\n" ..
     "  Smart Roles   - assign Tank/Healer/DPS based on spec\n" ..
-    "  Revive All    - revive every dead bot (incl. resurrection sickness)\n\n" ..
+    "  Revive All    - revive every dead bot (incl. resurrection sickness)\n" ..
+    "  BiS Overlay   - .bot bis * (T2 set overlay on whole raid)\n\n" ..
     "Resist sets: overlay a per-school resist gear set on every group bot.\n" ..
-    "  Use Fire for MC / Onyxia, Frost for Sapphiron/KT, Nature for Huhuran,\n" ..
-    "  Shadow for Four Horsemen / Nefarian phase 2."
+    "  Fire for MC / Onyxia, Frost for Sapphiron/KT, Nature for Huhuran,\n" ..
+    "  Shadow for Four Horsemen / Nefarian phase 2.\n\n" ..
+    "Instance teleport: GM command — select dungeon, click Teleport.\n" ..
+    "  Master only; bots are summoned via the cross-instance summon code."
 )
 
 -- ============================================================
