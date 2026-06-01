@@ -204,8 +204,11 @@ local function NewCombatRow(i)
     row.target:SetJustifyH("LEFT")
     row.target:SetTextColor(1, 0.82, 0)
 
-    -- LeftClick: TARGET the bot in-game (UnitID lookup via raid scan).
-    -- RightClick: focus this bot in the Strategy tab.
+    -- LeftClick: TARGET the bot in-game AND focus it in the Strategy tab.
+    --            (Single-click does both — users found the right-click-only
+    --            focus discoverability poor.)
+    -- RightClick: focus only (no target change, useful while keeping a boss
+    --             targeted).
     row:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     row:SetScript("OnClick", function()
         if not row.botName then return end
@@ -216,6 +219,9 @@ local function NewCombatRow(i)
             -- Try TargetByName which vanilla 1.12 supports for any player
             -- in the same raid/zone. Falls back silently if name not found.
             TargetByName(row.botName, true)
+            -- Also focus in the Strategy tab — visible state for the user
+            -- to inspect the bot's strategies/state without an extra click.
+            MCWoWBotsV2_FocusStrategy(row.botName)
         end
     end)
 
@@ -626,7 +632,10 @@ gearHelp:SetText(
     "  Fire for MC / Onyxia, Frost for Sapphiron/KT, Nature for Huhuran,\n" ..
     "  Shadow for Four Horsemen / Nefarian phase 2.\n\n" ..
     "Instance teleport: GM command — select dungeon, click Teleport.\n" ..
-    "  Master only; bots are summoned via the cross-instance summon code."
+    "  Master only; bots are summoned via the cross-instance summon code.\n\n" ..
+    "|cFFFFD100Focus target for bots:|r mark a |TInterface\\TargetingFrame\\UI-RaidTargetingIcon_8:14|t SKULL on the priority kill target.\n" ..
+    "Bots prioritize the skull-marked enemy over their default target selection — use it to\n" ..
+    "force focus-fire on Sulfuron Priestesses, Bug Trio kill order, Domo healers, etc."
 )
 
 -- ============================================================
@@ -658,7 +667,8 @@ end
 local function RefreshStrategy()
     if not focusedBot then
         stratHeader:SetText("Pick a bot in the Combat tab")
-        stratState:SetText("Click a row in the Combat tab to focus that bot here.")
+        stratState:SetText("Click any row in the Combat tab to focus that bot here.\n" ..
+                           "Tip: also mark a Skull |TInterface\\TargetingFrame\\UI-RaidTargetingIcon_8:14|t on the priority kill target — bots focus skull-marked enemies first.")
         stratList:SetText("")
         return
     end
