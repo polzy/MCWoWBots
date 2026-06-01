@@ -251,19 +251,13 @@ combatScroll:SetScript("OnVerticalScroll", function()
 end)
 
 -- ============================================================
--- Tab: ROSTER (static who-is-who: name, class, level from UnitClass/level)
+-- Tab: ROSTER (live per-unit table: class color name, lvl, role hint,
+--             HP/Mana%, mini health bar). Updates every refresh tick.
 -- ============================================================
 local rosterPanel = NewTabPanel("roster")
 
-local rosterText = rosterPanel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-rosterText:SetPoint("TOPLEFT", rosterPanel, "TOPLEFT", 0, -4)
-rosterText:SetPoint("BOTTOMRIGHT", rosterPanel, "BOTTOMRIGHT", 0, 0)
-rosterText:SetJustifyH("LEFT")
-rosterText:SetJustifyV("TOP")
-rosterText:SetText("Loading roster from group/raid...")
-
 local function ClassColorRGB(class)
-    -- Vanilla 1.12 class colors (no RAID_CLASS_COLORS global in early TBC)
+    -- Vanilla 1.12 class colors
     if class == "WARRIOR" then return 0.78, 0.61, 0.43 end
     if class == "PALADIN" then return 0.96, 0.55, 0.73 end
     if class == "HUNTER"  then return 0.67, 0.83, 0.45 end
@@ -276,31 +270,155 @@ local function ClassColorRGB(class)
     return 1, 1, 1
 end
 
-local function RefreshRoster()
-    local lines = {}
-    local function AddLine(unitTag)
-        if not UnitExists(unitTag) then return end
-        local name = UnitName(unitTag)
-        local _, class = UnitClass(unitTag)
-        local lvl = UnitLevel(unitTag) or "?"
-        local r, g, b = ClassColorRGB(class or "")
-        local hex = string.format("%02x%02x%02x", math.floor(r*255), math.floor(g*255), math.floor(b*255))
-        table.insert(lines, "  |cFF" .. hex .. name .. "|r  lvl " .. lvl .. "  (" .. (class or "?") .. ")")
+-- Rough role inference from class (vanilla doesn't expose role API).
+-- Used only as a display hint; real role lives in the bot's strategies.
+local function ClassRoleHint(class)
+    if class == "WARRIOR" or class == "DRUID" then return "T/D" end
+    if class == "PALADIN" or class == "PRIEST" or class == "SHAMAN" then return "H/D" end
+    return "DPS"
+end
+
+local ROSTER_ROW_H = 22
+local ROSTER_NUM_ROWS = 16
+local rosterRows = {}
+local rosterScroll = CreateFrame("ScrollFrame", FRAME_NAME .. "RosterScroll", rosterPanel, "FauxScrollFrameTemplate")
+rosterScroll:SetPoint("TOPLEFT", rosterPanel, "TOPLEFT", 0, -4)
+rosterScroll:SetPoint("BOTTOMRIGHT", rosterPanel, "BOTTOMRIGHT", -22, 0)
+
+local function NewRosterRow(i)
+    local row = CreateFrame("Frame", FRAME_NAME .. "RosterRow" .. i, rosterPanel)
+    row:SetWidth(FRAME_W - 70)
+    row:SetHeight(ROSTER_ROW_H)
+    row:SetPoint("TOPLEFT", rosterScroll, "TOPLEFT", 0, -((i - 1) * ROSTER_ROW_H))
+
+    if math.mod(i, 2) == 0 then
+        local bg = row:CreateTexture(nil, "BACKGROUND")
+        bg:SetAllPoints(row)
+        bg:SetTexture(1, 1, 1, 0.03)
     end
 
+    row.name = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    row.name:SetPoint("LEFT", row, "LEFT", 4, 0)
+    row.name:SetWidth(130)
+    row.name:SetJustifyH("LEFT")
+
+    row.lvl = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    row.lvl:SetPoint("LEFT", row.name, "RIGHT", 0, 0)
+    row.lvl:SetWidth(28)
+    row.lvl:SetJustifyH("CENTER")
+    row.lvl:SetTextColor(0.85, 0.85, 0.85)
+
+    row.role = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    row.role:SetPoint("LEFT", row.lvl, "RIGHT", 0, 0)
+    row.role:SetWidth(36)
+    row.role:SetJustifyH("CENTER")
+    row.role:SetTextColor(1, 0.82, 0)
+
+    -- Mini HP bar (texture-based, no StatusBar to keep frame count low).
+    row.hpbg = row:CreateTexture(nil, "BORDER")
+    row.hpbg:SetTexture(0.15, 0.15, 0.15, 0.8)
+    row.hpbg:SetPoint("LEFT", row.role, "RIGHT", 4, 0)
+    row.hpbg:SetWidth(140)
+    row.hpbg:SetHeight(10)
+
+    row.hp = row:CreateTexture(nil, "ARTWORK")
+    row.hp:SetPoint("LEFT", row.hpbg, "LEFT", 1, 0)
+    row.hp:SetHeight(8)
+
+    row.hpText = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    row.hpText:SetPoint("LEFT", row.hpbg, "LEFT", 0, 0)
+    row.hpText:SetPoint("RIGHT", row.hpbg, "RIGHT", 0, 0)
+    row.hpText:SetJustifyH("CENTER")
+    row.hpText:SetTextColor(1, 1, 1)
+
+    row.manaText = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    row.manaText:SetPoint("LEFT", row.hpbg, "RIGHT", 6, 0)
+    row.manaText:SetWidth(60)
+    row.manaText:SetJustifyH("LEFT")
+    row.manaText:SetTextColor(0.4, 0.6, 1)
+
+    return row
+end
+
+for i = 1, ROSTER_NUM_ROWS do
+    rosterRows[i] = NewRosterRow(i)
+end
+
+local function HPColorRGB(pct)
+    -- Smooth red→yellow→green gradient for the HP bar.
+    if pct >= 50 then
+        local t = (pct - 50) / 50  -- 0..1 from 50% to 100%
+        return 1 - t, 1, 0
+    else
+        local t = pct / 50  -- 0..1 from 0% to 50%
+        return 1, t, 0
+    end
+end
+
+local function CollectRosterUnits()
+    local units = {}
     local groupSize = GetNumRaidMembers() or 0
     if groupSize > 0 then
-        table.insert(lines, "Raid (" .. groupSize .. "):")
-        for i = 1, groupSize do AddLine("raid" .. i) end
+        for i = 1, groupSize do table.insert(units, "raid" .. i) end
     else
+        table.insert(units, "player")
         local party = GetNumPartyMembers() or 0
-        table.insert(lines, "Party (" .. (party + 1) .. "):")
-        AddLine("player")
-        for i = 1, party do AddLine("party" .. i) end
+        for i = 1, party do table.insert(units, "party" .. i) end
     end
-
-    rosterText:SetText(table.concat(lines, "\n"))
+    return units
 end
+
+local function RefreshRoster()
+    local units = CollectRosterUnits()
+    local total = table.getn(units)
+    FauxScrollFrame_Update(rosterScroll, total, ROSTER_NUM_ROWS, ROSTER_ROW_H)
+    local offset = FauxScrollFrame_GetOffset(rosterScroll)
+
+    for i = 1, ROSTER_NUM_ROWS do
+        local row = rosterRows[i]
+        local u = units[offset + i]
+        if u and UnitExists(u) then
+            local name = UnitName(u) or "?"
+            local _, class = UnitClass(u)
+            local lvl = UnitLevel(u) or 0
+            local hpCur = UnitHealth(u) or 0
+            local hpMax = UnitHealthMax(u) or 1
+            if hpMax == 0 then hpMax = 1 end
+            local hpPct = math.floor(hpCur * 100 / hpMax)
+            local manaCur = UnitMana(u) or 0
+            local manaMax = UnitManaMax(u) or 0
+
+            local r, g, b = ClassColorRGB(class or "")
+            row.name:SetText(name)
+            row.name:SetTextColor(r, g, b)
+            row.lvl:SetText(tostring(lvl))
+            row.role:SetText(ClassRoleHint(class or ""))
+
+            -- HP bar fill
+            local barWidth = 138 * (hpCur / hpMax)
+            if barWidth < 1 then barWidth = 1 end
+            row.hp:SetWidth(barWidth)
+            local hr, hg, hb = HPColorRGB(hpPct)
+            row.hp:SetTexture(hr, hg, hb, 0.85)
+            row.hpText:SetText(hpPct .. "%")
+
+            if manaMax > 0 then
+                local manaPct = math.floor(manaCur * 100 / manaMax)
+                row.manaText:SetText(manaPct .. "% mp")
+            else
+                row.manaText:SetText("")
+            end
+            row:Show()
+        else
+            row:Hide()
+        end
+    end
+end
+
+rosterScroll:SetScript("OnVerticalScroll", function()
+    FauxScrollFrame_OnVerticalScroll(ROSTER_ROW_H)
+    RefreshRoster()
+end)
 
 -- ============================================================
 -- Tab: GEAR (wraps V1 functions)
