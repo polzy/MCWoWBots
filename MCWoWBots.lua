@@ -323,58 +323,81 @@ end
 -- ============================================================
 -- Button handlers: Roles
 -- ============================================================
+-- MC raid layout sanity caps. Putting every warrior as tank (8+ tanks) wastes
+-- DPS and confuses threat. Standard 40-man MC = 1 MT + 2-3 OT, rest DPS.
+-- Standard healer count = 8-10. Bots above the cap stay at their default DPS
+-- role and contribute damage. User can still manually `.bot c <name> tank set`
+-- if they want extras.
+local MAX_TANKS = 4    -- 1 MT + 3 OT
+local MAX_HEALERS = 10 -- typical 40-man MC healer count
+
 function MCWoWBots_SetTanks()
-    -- Assign tank role to warriors in the group/raid
+    -- Assign tank role to up to MAX_TANKS highest-level warriors. Others stay DPS.
+    local warriors = {}
     local numRaid = GetNumRaidMembers()
-    local assigned = 0
     if numRaid > 0 then
         for i = 1, numRaid do
-            local name, _, _, _, class = GetRaidRosterInfo(i)
+            local name, _, _, level, class = GetRaidRosterInfo(i)
             if name and class == "Warrior" then
-                SendCmd(".bot c " .. name .. " tank set")
-                assigned = assigned + 1
+                table.insert(warriors, { name = name, lvl = level or 0 })
             end
         end
     else
         for i = 1, GetNumPartyMembers() do
-            if UnitClass("party" .. i) == "Warrior" then
-                local name = UnitName("party" .. i)
+            local unit = "party" .. i
+            local _, class = UnitClass(unit)
+            if class == "Warrior" then
+                local name = UnitName(unit)
                 if name then
-                    SendCmd(".bot c " .. name .. " tank set")
-                    assigned = assigned + 1
+                    table.insert(warriors, { name = name, lvl = UnitLevel(unit) or 0 })
                 end
             end
         end
     end
-    MCWoWBots_Print("Set " .. assigned .. " warrior(s) as tank.")
+    table.sort(warriors, function(a, b) return a.lvl > b.lvl end)
+    local cap = math.min(MAX_TANKS, table.getn(warriors))
+    for i = 1, cap do
+        SendCmd(".bot c " .. warriors[i].name .. " tank set")
+    end
+    local extras = table.getn(warriors) - cap
+    MCWoWBots_Print(string.format("Set %d warrior(s) as tank (capped at %d; %d remaining warrior(s) stay DPS).",
+        cap, MAX_TANKS, extras))
 end
 
 function MCWoWBots_SetHealers()
-    -- Assign healer role to priests and paladins in the group/raid
+    -- Assign healer role to up to MAX_HEALERS priests/paladins. Druids/shamans
+    -- can be added manually. Bots above the cap stay at their default role
+    -- (shadow priest, ret paladin) and contribute damage.
     local healClasses = { ["Priest"] = true, ["Paladin"] = true }
+    local healers = {}
     local numRaid = GetNumRaidMembers()
-    local assigned = 0
     if numRaid > 0 then
         for i = 1, numRaid do
-            local name, _, _, _, class = GetRaidRosterInfo(i)
+            local name, _, _, level, class = GetRaidRosterInfo(i)
             if name and healClasses[class] then
-                SendCmd(".bot c " .. name .. " heal set")
-                assigned = assigned + 1
+                table.insert(healers, { name = name, lvl = level or 0 })
             end
         end
     else
         for i = 1, GetNumPartyMembers() do
-            local class = UnitClass("party" .. i)
-            if class and healClasses[class] then
-                local name = UnitName("party" .. i)
+            local unit = "party" .. i
+            local _, class = UnitClass(unit)
+            if healClasses[class] then
+                local name = UnitName(unit)
                 if name then
-                    SendCmd(".bot c " .. name .. " heal set")
-                    assigned = assigned + 1
+                    table.insert(healers, { name = name, lvl = UnitLevel(unit) or 0 })
                 end
             end
         end
     end
-    MCWoWBots_Print("Set " .. assigned .. " priest/paladin(s) as healer.")
+    table.sort(healers, function(a, b) return a.lvl > b.lvl end)
+    local cap = math.min(MAX_HEALERS, table.getn(healers))
+    for i = 1, cap do
+        SendCmd(".bot c " .. healers[i].name .. " heal set")
+    end
+    local extras = table.getn(healers) - cap
+    MCWoWBots_Print(string.format("Set %d healer(s) (capped at %d; %d remaining priest/paladin stay DPS).",
+        cap, MAX_HEALERS, extras))
 end
 
 -- ============================================================
